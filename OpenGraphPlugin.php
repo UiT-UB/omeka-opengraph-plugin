@@ -1,20 +1,21 @@
 <?php
 
-define('TWITTER_CARDS_PLUGIN_DIR', dirname(__FILE__));
-define('TWITTER_CARDS_SITE_HANDLE_OPTION', 'twittercards_site_handle');
-
-class TwitterOpenGraphCardsPlugin extends Omeka_Plugin_AbstractPlugin
+class OpenGraphPlugin extends Omeka_Plugin_AbstractPlugin
 {
   protected $_hooks =array(
+	'install',
     'uninstall',
-    'public_head',
-    'config',
-    'config_form'
+    'public_head'
   );
+
+  public function hookInstall()
+  {
+
+  }
 
   public function hookUninstall()
   {
-    delete_option(TWITTER_CARDS_SITE_HANDLE_OPTION);
+
   }
 
   public function hookPublicHead($args)
@@ -43,8 +44,8 @@ class TwitterOpenGraphCardsPlugin extends Omeka_Plugin_AbstractPlugin
     try {
       $item = get_current_record('item');
       $title = metadata('item', array('Dublin Core', 'Title'));
-      $description = metadata('item', array('Dublin Core', 'Description'));
-      if (strlen($title) > 0 && strlen($description) > 0){
+	  $description = metadata('item', array('Dublin Core', 'Description'), array('delimiter' => ' '));
+      if (strlen($title) > 0){
         foreach (loop('files', $item->Files) as $file){
           if($file->hasThumbnail()){
             $image_url = file_display_url($file, 'thumbnail');
@@ -57,7 +58,22 @@ class TwitterOpenGraphCardsPlugin extends Omeka_Plugin_AbstractPlugin
       //  no item, don't do anything
     }
 
-    // Is the curent record an collection?  Use its metadata.
+    // Is the curent record a file?  Use its metadata.
+    try {
+      $fileRecord = get_current_record('file');
+      $title = metadata('file', array('Dublin Core', 'Title'));
+      $description = metadata('file', array('Dublin Core', 'Description'), array('delimiter' => ' '));
+      if (strlen($title) > 0){
+          if($fileRecord->hasThumbnail()){
+            $image_url = file_display_url($fileRecord, 'thumbnail');
+          }
+      }
+    }
+    catch (Omeka_View_Exception $ove){
+      //  no file, don't do anything
+    }
+
+    // Is the curent record a collection?  Use its metadata.
     try {
       $collection = get_current_record('collection');
       $title = metadata('collection', array('Dublin Core', 'Title'));
@@ -73,7 +89,8 @@ class TwitterOpenGraphCardsPlugin extends Omeka_Plugin_AbstractPlugin
     }
 
     // Default to the site settings if we didn't find anything else to use
-    if (strlen($title) < 1 || strlen($description) < 1){
+    if (strlen($title) < 1){
+      echo "<meta object=\"default\" />"."\n";
       $title = option('site_title');
       $description = option('description');
       $items = get_random_featured_items(1, true);
@@ -87,16 +104,7 @@ class TwitterOpenGraphCardsPlugin extends Omeka_Plugin_AbstractPlugin
       }
     }
 
-    if (strlen($title) > 0 && strlen($description) > 0){
-      //twitter
-      echo '<meta property="twitter:card" content="summary" />'."\n";
-      echo '<meta property="twitter:site" content="'.get_option(TWITTER_CARDS_SITE_HANDLE_OPTION).'" />'."\n";
-      echo '<meta property="twitter:title" content="'.strip_tags(html_entity_decode($title)).'" />'."\n";
-      echo '<meta property="twitter:description" content="'.strip_tags(html_entity_decode($description)).'" />'."\n";
-
-      if (strlen($image_url) > 0){
-        echo '<meta property="twitter:image:src" content="'.$image_url.'" />'."\n";
-      }
+    if (strlen($title) > 0){
       
       //opengraph
       echo '<meta property="og:url" content="'.$_SERVER['SERVER_NAME'].$_SERVER['REQUEST_URI'].'" />'."\n";
@@ -108,20 +116,5 @@ class TwitterOpenGraphCardsPlugin extends Omeka_Plugin_AbstractPlugin
         echo '<meta property="og:image" content="'.$image_url.'" />'."\n"; 
       }
     }
-
-  }
-
-  public function hookConfig($args)
-  {
-    $post = $args['post'];
-    set_option(
-      TWITTER_CARDS_SITE_HANDLE_OPTION,
-      $post[TWITTER_CARDS_SITE_HANDLE_OPTION]
-    );
-  }
-
-  public function hookConfigForm()
-  {
-    include TWITTER_CARDS_PLUGIN_DIR . '/config_form.php';
   }
 }
